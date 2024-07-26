@@ -1,18 +1,23 @@
+# Use an official Debian image as a base
 FROM debian:sid
 
-ENV LANG C.UTF-8
-ENV USER root
-ENV HOME /cloudfail
-ENV DEBIAN_FRONTEND noninteractive
+# Set environment variables
+ENV LANG=C.UTF-8
+ENV USER=root
+ENV HOME=/cloudfail
+ENV DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get update
+# Update the package list and install dependencies
+RUN apt-get update && apt-get install -yq python3-pip
 
-RUN apt-get install -yq python3-pip
-
+# Copy the current directory contents into the container at $HOME
 COPY . $HOME
 
+# Set the working directory to $HOME
 WORKDIR $HOME
 
+# Install Python dependencies
 RUN pip3 install -r requirements.txt
 
+# Set the entrypoint to run the cloudfail.py script
 ENTRYPOINT ["python3", "cloudfail.py"]

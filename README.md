@@ -70,8 +70,3 @@ python3 cloudfail.py --target seo.com --tor
 - requests
 - win_inet_pton
 - dnspython
-
-
-[![Donate](https://img.shields.io/badge/Donate-Support%20us-blue.svg)](https://github.com/LightYagami28/CloudFail/donate.md)
-
-🍺 Buy me a beer or coffee... or both! If you donate, send me a message, and I will add you to the credits! Thanks

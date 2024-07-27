@@ -1,71 +1,73 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
-SocksiPy + urllib2 handler
+SocksiPy + urllib.request handler
 
-version: 0.3
+version: 0.4
 author: e<e@tr0ll.in>
 
-This module provides a Handler which you can use with urllib2 to allow it to tunnel your connection through a socks.sockssocket socket, with out monkey patching the original socket...
+This module provides a Handler that you can use with urllib.request to tunnel your connection through a SOCKS proxy, without monkey patching the original socket.
 """
+
 import ssl
+import urllib.request as urllib2
+import http.client as httplib
+import socks  # $ pip install PySocks
+from typing import Optional, Dict, Any
 
-try:
-    import urllib2
-    import httplib
-except ImportError: # Python 3
-    import urllib.request as urllib2
-    import http.client as httplib
-
-import socks # $ pip install PySocks
-
-def merge_dict(a, b):
+def merge_dict(a: Dict[str, Any], b: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Merge two dictionaries into one.
+    """
     d = a.copy()
     d.update(b)
     return d
 
 class SocksiPyConnection(httplib.HTTPConnection):
-    def __init__(self, proxytype, proxyaddr, proxyport=None, rdns=True, username=None, password=None, *args, **kwargs):
+    def __init__(self, proxytype: int, proxyaddr: str, proxyport: Optional[int] = None,
+                 rdns: bool = True, username: Optional[str] = None, password: Optional[str] = None,
+                 *args, **kwargs):
         self.proxyargs = (proxytype, proxyaddr, proxyport, rdns, username, password)
-        httplib.HTTPConnection.__init__(self, *args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def connect(self):
         self.sock = socks.socksocket()
-        self.sock.setproxy(*self.proxyargs)
-        if type(self.timeout) in (int, float):
+        self.sock.set_proxy(*self.proxyargs)
+        if isinstance(self.timeout, (int, float)):
             self.sock.settimeout(self.timeout)
         self.sock.connect((self.host, self.port))
 
 class SocksiPyConnectionS(httplib.HTTPSConnection):
-    def __init__(self, proxytype, proxyaddr, proxyport=None, rdns=True, username=None, password=None, *args, **kwargs):
+    def __init__(self, proxytype: int, proxyaddr: str, proxyport: Optional[int] = None,
+                 rdns: bool = True, username: Optional[str] = None, password: Optional[str] = None,
+                 *args, **kwargs):
         self.proxyargs = (proxytype, proxyaddr, proxyport, rdns, username, password)
-        httplib.HTTPSConnection.__init__(self, *args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def connect(self):
         sock = socks.socksocket()
-        sock.setproxy(*self.proxyargs)
-        if type(self.timeout) in (int, float):
+        sock.set_proxy(*self.proxyargs)
+        if isinstance(self.timeout, (int, float)):
             sock.settimeout(self.timeout)
         sock.connect((self.host, self.port))
         self.sock = ssl.wrap_socket(sock, self.key_file, self.cert_file)
 
 class SocksiPyHandler(urllib2.HTTPHandler, urllib2.HTTPSHandler):
-    def __init__(self, *args, **kwargs):
-        self.args = args
-        self.kw = kwargs
-        urllib2.HTTPHandler.__init__(self)
+    def __init__(self, proxytype: int, proxyaddr: str, proxyport: Optional[int] = None,
+                 rdns: bool = True, username: Optional[str] = None, password: Optional[str] = None,
+                 *args, **kwargs):
+        self.proxyargs = (proxytype, proxyaddr, proxyport, rdns, username, password)
+        super().__init__()
 
-    def http_open(self, req):
-        def build(host, port=None, timeout=0, **kwargs):
-            kw = merge_dict(self.kw, kwargs)
-            conn = SocksiPyConnection(*self.args, host=host, port=port, timeout=timeout, **kw)
-            return conn
+    def http_open(self, req: urllib2.Request) -> urllib2.HTTPResponse:
+        def build(host: str, port: Optional[int] = None, timeout: float = 0, **kwargs: Any) -> SocksiPyConnection:
+            kw = merge_dict(self.proxyargs, kwargs)
+            return SocksiPyConnection(*self.proxyargs, host=host, port=port, timeout=timeout, **kw)
         return self.do_open(build, req)
 
-    def https_open(self, req):
-        def build(host, port=None, timeout=0, **kwargs):
-            kw = merge_dict(self.kw, kwargs)
-            conn = SocksiPyConnectionS(*self.args, host=host, port=port, timeout=timeout, **kw)
-            return conn
+    def https_open(self, req: urllib2.Request) -> urllib2.HTTPResponse:
+        def build(host: str, port: Optional[int] = None, timeout: float = 0, **kwargs: Any) -> SocksiPyConnectionS:
+            kw = merge_dict(self.proxyargs, kwargs)
+            return SocksiPyConnectionS(*self.proxyargs, host=host, port=port, timeout=timeout, **kw)
         return self.do_open(build, req)
 
 if __name__ == "__main__":
@@ -74,6 +76,12 @@ if __name__ == "__main__":
         port = int(sys.argv[1])
     except (ValueError, IndexError):
         port = 9050
-    opener = urllib2.build_opener(SocksiPyHandler(socks.PROXY_TYPE_SOCKS5, "localhost", port))
-    print("HTTP: " + opener.open("http://httpbin.org/ip").read().decode())
-    print("HTTPS: " + opener.open("https://httpbin.org/ip").read().decode())
+
+    try:
+        opener = urllib2.build_opener(SocksiPyHandler(socks.PROXY_TYPE_SOCKS5, "localhost", port))
+        http_response = opener.open("http://httpbin.org/ip").read().decode()
+        https_response = opener.open("https://httpbin.org/ip").read().decode()
+        print(f"HTTP: {http_response}")
+        print(f"HTTPS: {https_response}")
+    except Exception as e:
+        print(f"An error occurred: {e}")
